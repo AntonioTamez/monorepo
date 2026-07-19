@@ -70,3 +70,46 @@ Se corrió `bmad-code-review` sobre el diff de esta historia. Tres hallazgos lle
 - **Un archivo de CI (`​.github/workflows/ci.yml`) había llegado con el scaffolding del template** — corría en cada push a `main`/PR, dependía de Nx Cloud (sin token configurado) y de un target `e2e` que ninguna app tiene. Se decidió borrarlo hasta diseñar un CI real más adelante (candidato: cuando se llegue a la Fase 4, deploy).
 - **Los 3 Remotes exponen su `AppComponent` raíz en la federación (`./Component`) en vez de una ruta lazy** — la arquitectura prohíbe esto como estado final, pero hoy es boilerplate transitorio (todavía no hay rutas de negocio, eso es Fase 1/2). Se dejó así a propósito, con un comentario `TODO(Story 1.3)` en cada `federation.config.mjs` para no olvidarlo.
 - **El budget de tamaño del Shell no estaba calibrado contra el límite real de 300KB gzip** — Angular CLI mide en bytes crudos, no gzip, así que se derivó un techo aproximado (~1MB crudo) a partir del ratio de compresión medido en el build real (~30%).
+
+## Story 1.2 — Organización de libs con tags Nx y boundaries enforced
+
+### Comandos ejecutados (en orden)
+
+1. **Reemplazar el bloque `depConstraints` de `eslint.config.mjs`.** Ya existía un bloque `@nx/enforce-module-boundaries` desde el scaffolding de Story 1.1, pero con reglas del demo (`scope:shop`, `scope:api`, `type:data`) que nunca se limpiaron. Se reemplazó completo por las reglas reales: `scope:shell/catalogo/carrito/perfil` (cada uno solo puede depender de sí mismo + `scope:shared`), `scope:shared` (solo de sí mismo), y `type:feature → [ui, data-access, util]` / `type:ui`, `type:data-access → [util]` / `type:util → []`.
+
+2. **Etiquetar los 4 apps con su `scope` en cada `project.json`** (`"tags": ["scope:shell"]`, etc.). Esto es lo que hace que las reglas del paso 1 tengan algo a qué aplicarse — sin tags, `depConstraints` no tiene efecto.
+
+3. **Probar el boundary de scope agregando un import temporal** de `apps/catalogo` dentro de `apps/carrito`, correr `npx nx lint carrito`, confirmar que falla, y revertir el import. No hizo falta crear nada nuevo para esto — las 4 apps ya existían desde Story 1.1.
+
+4. **Probar el boundary de tipo con dos libs desechables:**
+   `npx nx g @nx/js:library libs/shared/scratch-ui --bundler=none --unitTestRunner=none --tags="scope:shared,type:ui"` (y lo mismo para `scratch-data-access` con `type:data-access`). Se agregó un import de `scratch-data-access` dentro de `scratch-ui`, se corrió `npx nx lint scratch-ui` para confirmar que fallaba, y después **se borraron ambas libs por completo** (`rm -rf libs/shared/scratch-*`, más los path-aliases que el generador había agregado a `tsconfig.base.json`). Esto se hizo con libs de mentira, a propósito — las libs reales con contenido (Product, Cart, etc.) todavía no existen y no correspondía crearlas antes de tiempo solo para probar una regla de lint.
+
+5. **`npx nx run-many -t lint,test,build --projects=shell,catalogo,carrito,perfil`** — misma verificación de regresión que en Story 1.1, ahora con los boundaries activos.
+
+### Por qué se hizo así
+
+- **El boundary de scope no falló como se esperaba, pero falló igual.** La intención era ver un error de `depConstraints` citando el tag de scope. En la práctica, `@nx/enforce-module-boundaries` tiene una regla previa: ningún proyecto se puede importar por path relativo entre carpetas de proyecto, tiene que ser vía un alias de npm-scope. Como ninguna app tiene un alias así configurado (no están pensadas para ser importadas entre sí), cualquier intento cae en esa regla antes de llegar a evaluar el tag. El resultado (el lint falla) es el mismo que pedía el criterio de aceptación, así que no se cambió nada — pero vale saber que la prueba "fina" por tag recién se va a ver de verdad cuando existan libs reales de distintos scopes importándose entre sí (a partir de la Fase 1).
+- **Por qué usar libs "de mentira" (`scratch-*`) en vez de esperar a las libs reales:** crear `libs/shared/util-types` o `libs/catalogo/feature-listado` antes de que una historia los necesite de verdad rompería el principio de "no crear estructura por adelantado" que ya se venía respetando desde Story 1.1. Las libs de scratch cumplen el único propósito de esta historia (probar que la regla de lint funciona) sin adelantar trabajo de historias futuras.
+- **Nx no deja nombrar un proyecto empezando con `_`** (ej. `_scratch-ui` falló con un error de patrón de nombre) — por eso terminaron llamándose `scratch-ui`/`scratch-data-access`, sin guion bajo.
+
+### Code review de Story 1.2 (2026-07-19)
+
+**Comandos ejecutados (en orden):**
+
+1. **Revisión en paralelo** (Blind Hunter, Edge Case Hunter, Acceptance Auditor) sobre `git diff HEAD` — encontraron la contradicción de Architecture descrita abajo, más 5 findings menores (comentarios sin tildes, un comentario que confundía Shell con "Remote", el File List incompleto, y la prueba de AC3 sin valor real).
+2. **Corrección de `ARCHITECTURE-SPINE.md`:** se editó la tabla del Design Paradigm y la regla de AD-2 para reflejar que `ui`/`data-access` también pueden depender de su propio tipo cuando el destino es `scope:shared` (antes solo `util`). Se logueó el cambio en el `.memlog.md` de la arquitectura.
+3. **Corrección de `eslint.config.mjs`:** `type:ui` y `type:data-access` pasaron de `onlyDependOnLibsWithTags: ['type:util']` a `['type:util', 'type:ui']` / `['type:util', 'type:data-access']` respectivamente. También se corrigieron las tildes y el comentario de AD-1.
+4. **Verificación del fix con 5 libs de scratch reales** (`nx g @nx/js:library ... --tags="scope:X,type:Y"`, con `--name` explícito para evitar colisión de nombres entre carpetas):
+   - `scratch-catalogo-feature` (scope:catalogo) importando `scratch-carrito-feature` (scope:carrito) → **falló** con el mensaje real de `depConstraints` por scope — esto es lo que prueba AC3 de verdad (antes solo se había probado con apps, que fallan por una regla distinta).
+   - `scratch-catalogo-ui` (scope:catalogo, type:ui) importando `scratch-shared-ui` (scope:shared, type:ui) → **pasó** — confirma que el fix del paso 3 funciona.
+   - El mismo `scratch-catalogo-ui` importando además `scratch-carrito-ui` (scope:carrito, type:ui) → **falló** — confirma que el aislamiento entre dominios (el eje de scope) sigue intacto, el fix no abrió ningún agujero.
+   - Las 5 libs se borraron por completo al terminar (`rm -rf`), y los path-aliases que dejaron en `tsconfig.base.json` también se limpiaron.
+5. **`npx nx run-many -t lint,test,build --projects=shell,catalogo,carrito,perfil`** — regresión final, 12/12 verde.
+
+Esta vez el hallazgo importante no fue un bug de la historia, sino **una contradicción real en la propia `ARCHITECTURE-SPINE.md`**: la tabla del Design Paradigm decía que `ui`/`data-access` dependen "únicamente de util", pero el diagrama mermaid de la misma sección (AD-2) dibuja `catalogo-ui → shared-ui` y `catalogo-data-access → shared-cart` — o sea, cada dominio consumiendo el Design System y los servicios compartidos, que es justo lo que el proyecto necesita (FR-8, FR-4, FR-7). La implementación inicial de esta historia siguió la tabla al pie de la letra, así que en cuanto existieran esas libs reales (Fase 1/2), el lint las habría bloqueado.
+
+**La corrección, para que quede claro el razonamiento:** el aislamiento entre dominios (que ningún Remote toque el código de otro) lo garantiza el eje de **scope**, no el de **tipo**. Una vez que eso se entiende, dejar que `ui` dependa de `ui` (y `data-access` de `data-access`) *cuando el destino es `scope:shared`* no abre ningún agujero — `catalogo-ui` puede llegar a `shared-ui`, pero nunca a `carrito-ui`, porque el eje de scope sigue bloqueando ese segundo caso sin importar qué diga el eje de tipo. Se corrigió tanto la tabla/regla de Architecture como el `eslint.config.mjs`, y se verificó con libs de mentira que las dos cosas (el nuevo permiso Y el aislamiento que sigue intacto) funcionan como se espera.
+
+También se detectó que la prueba de AC3 (boundary de scope) de la primera pasada no había probado nada de verdad — había fallado por una regla genérica de Nx, no por la regla de scope en sí. Se rehizo con libs de mentira con scopes distintos, y ahí sí se vio el mensaje real de la regla.
+
+**Un finding que se investigó y se descartó, para que quede como ejemplo de "verificar antes de aplicar":** un revisor sugirió agregar una regla de "fallback" para proyectos sin tag. Antes de tocar nada, se confirmó contra la documentación oficial de Nx que el comportamiento real es al revés de lo que el revisor asumía — un proyecto sin tags ya está bloqueado por default, no libre. Agregar el fallback sugerido hubiera sido el error, no la solución.

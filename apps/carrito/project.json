@@ -4,7 +4,7 @@
   "projectType": "application",
   "prefix": "app",
   "sourceRoot": "apps/carrito/src",
-  "tags": [],
+  "tags": ["scope:carrito"],
   "targets": {
     "build": {
       "executor": "@angular-architects/native-federation:build",

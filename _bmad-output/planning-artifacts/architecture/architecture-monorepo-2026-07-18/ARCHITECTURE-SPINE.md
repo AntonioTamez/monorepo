@@ -7,7 +7,7 @@ paradigm: 'micro-frontend (shell + remotes) vía Native Federation, con librerí
 scope: 'Shell + 3 Remotes (Catálogo, Carrito/Checkout, Perfil) federados en runtime; libs compartidas de UI, sesión, carrito y tipos; deploy estático de producción — MVP1 completo (PRD prd-monorepo-2026-07-17)'
 status: final
 created: '2026-07-18'
-updated: '2026-07-18'
+updated: '2026-07-19'
 binds: ['FR-1', 'FR-2', 'FR-3', 'FR-4', 'FR-5', 'FR-6', 'FR-7', 'FR-8', 'FR-9', 'FR-10', 'FR-11']
 sources:
   - '../../prds/prd-monorepo-2026-07-17/prd.md'
@@ -28,9 +28,11 @@ Dentro de cada proyecto Nx (Shell, cada Remote, cada lib compartida), las libs s
 | Tipo | Rol | Puede depender de |
 |---|---|---|
 | `feature` | Smart components, rutas, orquestación de un dominio (ej. `catalogo-feature-listado`) | `ui`, `data-access`, `util` del mismo `scope`; `util`/`data-access` de `scope:shared` |
-| `ui` | Componentes presentacionales puros, sin estado de negocio ni llamadas a `data-access` | `util` únicamente |
-| `data-access` | Estado y acceso a datos del dominio (services, signals, mocks) | `util` únicamente |
+| `ui` | Componentes presentacionales puros, sin estado de negocio ni llamadas a `data-access` | `util` del mismo `scope`; `util`/`ui` de `scope:shared` (ej. `catalogo-ui` consume el Design System compartido) |
+| `data-access` | Estado y acceso a datos del dominio (services, signals, mocks) | `util` del mismo `scope`; `util`/`data-access` de `scope:shared` (ej. `catalogo-data-access` consume `libs/shared/cart`) |
 | `util` | Tipos, helpers puros, sin Angular DI de negocio | nada (hoja del grafo) |
+
+El aislamiento entre dominios (AD-1) lo garantiza el eje de `scope` — un lib de `scope:catalogo` nunca puede alcanzar `scope:carrito`, sin importar el tipo. El eje de `type` solo gobierna la dirección dentro de los tipos permitidos; permitir `ui→ui` y `data-access→data-access` no reabre ese aislamiento porque sigue acotado a `scope:shared` como único destino cross-scope.
 
 Federación estática (MVP1): las URLs de los 3 Remotes están fijas en la configuración del Shell — no hay Manifest ni resolución en runtime (eso es MVP2, ver Deferred).
 
@@ -46,7 +48,7 @@ Federación estática (MVP1): las URLs de los 3 Remotes están fijas en la confi
 
 - **Binds:** todas las libs del workspace (Shell, Remotes, shared)
 - **Prevents:** que un componente `ui` termine llamando `data-access` directo (mezclando presentación con estado), o que `util` importe algo con estado y deje de ser una hoja segura de reusar en cualquier lado.
-- **Rule:** `feature → {ui, data-access, util}` → `util` únicamente desde `ui`/`data-access` → `util` no depende de nada. Ningún salto hacia atrás (`ui`/`util` nunca importan `feature`; `util` nunca importa `ui`/`data-access`). Enforced vía tags de tipo (`type:feature`, `type:ui`, `type:data-access`, `type:util`) + `@nx/enforce-module-boundaries`.
+- **Rule:** `feature → {ui, data-access, util}` → `ui`/`data-access` dependen de `util`, y también de su propio tipo cuando el destino es `scope:shared` (ej. `catalogo-ui → shared-ui`, `catalogo-data-access → shared-cart`) → `util` no depende de nada. Ningún salto hacia atrás (`ui`/`util` nunca importan `feature`; `util` nunca importa `ui`/`data-access`). El aislamiento entre dominios lo sigue garantizando el eje de `scope` (AD-1) — permitir `ui→ui`/`data-access→data-access` no habilita `catalogo-ui → carrito-ui`, solo el camino hacia `scope:shared`. Enforced vía tags de tipo (`type:feature`, `type:ui`, `type:data-access`, `type:util`) + `@nx/enforce-module-boundaries`.
 
 ```mermaid
 graph LR
