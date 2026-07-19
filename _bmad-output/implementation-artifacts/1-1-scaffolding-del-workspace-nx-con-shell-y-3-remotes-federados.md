@@ -4,7 +4,7 @@ baseline_commit: dd4b848
 
 # Story 1.1: Scaffolding del workspace Nx con Shell y 3 Remotes federados
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -37,11 +37,28 @@ so that tengo la base federada mínima corriendo antes de construir cualquier fe
   - [x] `nx g ... --project carrito --type remote --port 4202`, `nx g ... --project perfil --type remote --port 4203`
   - [x] Verificado en los 4 `federation.config.mjs`: `shareAll({ singleton: true, strictVersion: true, requiredVersion: 'auto', build: 'package' })` — el schematic ya lo trae por defecto para **todas** las deps compartidas (no solo Angular/RxJS), superando el mínimo de AD-6. `requiredVersion: 'auto'` lee la versión real instalada en vez de un string hardcodeado — cierra en la práctica la preocupación de Architecture sobre una única fuente de verdad de versión.
 - [x] Task 3: Verificar federación end-to-end (AC: 4)
-  - [x] `nx serve shell` en background → build completo en ~2.3s, sirvió HTTP 200 en `http://localhost:4200/` con HTML válido (ESM shims activos para federación). Verificado con `curl`, no con navegador real (no disponible en este entorno) — ver Completion Notes.
+  - [x] `nx serve shell` en background → build completo en ~2.3s, sirvió HTTP 200 en `http://localhost:4200/` con HTML válido (ESM shims activos para federación).
+  - [x] **[Code review]** Re-verificado con los 4 servers corriendo a la vez (`nx serve shell/catalogo/carrito/perfil`): las 4 raíces (`/`) y los 3 `remoteEntry.json` responden HTTP 200 — la condición real que valida AC4 (initFederation no cae en el `.catch` cuando los remotes existen). Sigue sin haber navegador real en este entorno para confirmar la consola visualmente, pero el precondition de red está confirmado.
   - [x] `main.ts` del Shell corregido a mano: el generador de `init --type host` dejó los 3 Remotes apuntando los 3 al puerto 4200 (placeholder, no sabía los puertos reales todavía) — se corrigió a 4201/4202/4203 tras generar los remotes.
 - [x] Task 4: Fijar versiones del Stack en la raíz del workspace (AC: 3, soporte a NFR-3/NFR-8)
-  - [x] `package.json`: Angular 22.0.6, Nx 23.1.0, `@angular-architects/native-federation` 22.0.6 — todos pins exactos, sin `^`/`~`
+  - [x] `package.json`: de los paquetes que Architecture pinea explícitamente en su tabla Stack (Angular 22.0.6, Nx 23.1.0, `@angular-architects/native-federation` 22.0.6, TypeScript 6.0.3) todos son pins exactos, sin `^`/`~`. El resto de devDependencies (eslint, vitest, playwright, etc.) usa rangos normales de tooling — la política de pinning de Architecture/PRD §9 aplica solo a la tabla Stack, no a todo el árbol de dependencias.
   - [x] Política de versionado documentada en `instrucciones.md` (bitácora del proyecto) en vez de en el README genérico de Nx — ver Completion Notes
+
+### Review Findings
+
+- [x] [Review][Patch] Remotes exponen el `AppComponent` raíz (`./Component`) en vez de una ruta lazy — resuelto: se dejó como está (no hay rutas reales que exponer todavía) y se documentó como provisional con un comentario `TODO(Story 1.3)` en los 3 `federation.config.mjs`, citando la regla de Architecture que hay que cumplir al reemplazarlo. [apps/{catalogo,carrito,perfil}/federation.config.mjs]
+- [x] [Review][Patch] NFR-7 (Shell <300KB gzip, "blocker" según Architecture) no tenía gate automatizado — resuelto: budget de `apps/shell/project.json` ajustado a `maximumWarning: 700kb` / `maximumError: 1mb` (bytes crudos), calibrado contra el ratio de compresión real medido en este build (~30% transfer/raw → 300KB gzip ≈ 1MB raw). [apps/shell/project.json]
+- [x] [Review][Patch] AC3 dice "requiredVersion fijado" pero la implementación usa `requiredVersion: 'auto'` — resuelto: se acepta `'auto'` como la implementación correcta (más segura que un string fijo a mano, no puede desincronizarse); se aclara en Dev Notes que esto satisface la intención del AC (evitar version mismatch), no su letra literal. [apps/*/federation.config.mjs]
+- [x] [Review][Patch] `.github/workflows/ci.yml` llegó con el scaffolding del template y corría automáticamente en cada push a `main`/PR sin Nx Cloud configurado — resuelto: se eliminó (`.github/workflows/`) hasta que el proyecto tenga CI real diseñado a propósito (Story 5.x). [.github/workflows/ci.yml — eliminado]
+- [x] [Review][Patch] Completion Notes afirmaban "todos pins exactos, sin ^/~" de forma más amplia de lo que exige la Architecture — corregido: la afirmación ahora se acota a los paquetes de la tabla Stack (Nx/Angular/native-federation/TypeScript), que sí están exactos; el resto de devDependencies usa rangos normales de tooling, sin violar ninguna política. [package.json]
+- [x] [Review][Patch] `instrucciones.md` no escribía la política real de congelamiento/bump-atómico de versiones — agregado un párrafo explícito en la sección "Por qué se hizo así". [instrucciones.md]
+- [x] [Review][Patch] `nx.json` `targetDefaults` no tenía entrada para `@angular-architects/native-federation:build` — agregada (`cache`, `dependsOn: ["^build"]`, `outputs`), verificado con `nx reset` + 2 builds seguidos: segundo build cacheado (100%, 47ms vs 11.6s). [nx.json]
+- [x] [Review][Patch] `zone.js` seguía como dependencia sin uso — verificado (sin referencias en código ni en `polyfills`, apps generadas zoneless por default de Angular 22) y removido de `package.json`; `npm install` confirma que no rompe nada (solo remueve ese paquete). [package.json]
+- [x] [Review][Defer] URLs de remotos hardcodeadas a `localhost` en `main.ts`, sin mecanismo dev/prod — deferred, real para AD-7 (deploy) pero es trabajo de Story 5.x, no de esta historia. [apps/shell/src/main.ts]
+- [x] [Review][Defer] Sin fuente única de verdad que ligue el puerto de cada remote (`project.json`) con las URLs hardcodeadas en `main.ts` de forma automática — deferred, bajo riesgo con 4 apps estáticas, revisitar si se vuelve doloroso. [apps/shell/src/main.ts]
+- [x] [Review][Defer] `initFederation(...).catch(err => console.error(err))` traga cualquier fallo sin señal visible al usuario ni timeout — deferred, es exactamente lo que AD-5/RemoteUnavailableComponent va a resolver en Story 1.3/1.5. [apps/shell/src/main.ts]
+- [x] [Review][Defer] `tsconfig.base.json` combina `target: es2015` con `lib: [es2020, dom]`, sin explicación — deferred, heredado del template `angular` de Nx, no bloquea nada hoy (esbuild controla el nivel de salida real). [tsconfig.base.json]
+- [x] [Review][Defer] Tooling de testing (vitest, plugin playwright) quedó fijado por default de `nx.json` pese a que Architecture difiere explícitamente la profundidad de testing — deferred, default blando y fácil de cambiar, revisitar cuando esa pregunta se resuelva. [nx.json]
 
 ## Dev Notes
 
@@ -63,6 +80,13 @@ El addendum sigue siendo válido como contexto de *por qué* se eligió Native F
 **Testing:** la profundidad de testing automatizado queda explícitamente Deferred (Architecture spine, PRD Open Question 4) — esta historia se verifica manualmente (`nx serve shell` sin errores), no requiere suite de tests todavía.
 
 **Stack pineado (verificado vía web 2026-07-18, ver Architecture Spine §Stack):** Nx 23.1 (mínimo que soporta Angular 22 según la matriz oficial Nx↔Angular), Angular 22, `@angular-architects/native-federation` 22.0.6, Node.js 24 (Active LTS). Fijar exacto, no rangos — PRD §9 prohíbe bumps mid-project salvo blocker de seguridad.
+
+### Code Review Resolutions (2026-07-19)
+
+- **Budget de NFR-7 calibrado, no adivinado.** Angular CLI no tiene un tipo de budget nativo en gzip, solo en bytes crudos. Se midió el ratio real de este build (`nx build shell --configuration=production`: 103.89 kB raw / 31.02 kB transfer estimado ≈ 30%) y se derivó el ceiling en bytes crudos: 300KB gzip ÷ 0.30 ≈ 1MB raw. Budget actualizado a `maximumWarning: 700kb` / `maximumError: 1mb` en `apps/shell/project.json`. Si el ratio de compresión cambia mucho cuando entre contenido real (Story 2.x+), recalibrar.
+- **`requiredVersion: 'auto'` aceptado como cumplimiento de intención, no de la letra literal de AC3.** Lee la versión real instalada en vez de un string fijo a mano — no puede desincronizarse entre Shell y Remotes, que es lo que AD-6/AC3 buscan evitar. Confirmado con Antonio en el code review de esta historia.
+- **Exposed module `./Component` es intencionalmente provisional.** Los 3 Remotes exponen su `AppComponent` raíz porque todavía no existen rutas de negocio (esas llegan en Story 1.3). Se documentó con un comentario `TODO(Story 1.3)` en cada `federation.config.mjs` en vez de inventar una ruta placeholder ahora — Architecture prohíbe exponer el bootstrap completo como estado *final*, no como paso intermedio de un scaffold que se sabe incompleto.
+- **`.github/workflows/ci.yml` eliminado.** Llegó con el scaffolding del template, corría en cada push/PR contra Nx Cloud sin token configurado y con un target `e2e` inexistente. Se decidió no tener CI hasta diseñarlo a propósito (candidato natural: Story 5.x, junto con el deploy).
 
 ### Project Structure Notes
 
@@ -127,9 +151,18 @@ Claude Sonnet 5 (claude-sonnet-5)
 - `vitest.workspace.ts` (raíz, generado)
 
 **Sin tocar (ya existían o se dejaron por decisión del usuario, no son parte del alcance de esta historia):**
-- `.agents/`, `.codex/`, `.cursor/`, `.gemini/`, `.opencode/`, `.github/`, `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.claude/settings.json`
-- `_bmad/`, `_bmad-output/`, `docs/`, `design-artifacts/`, `instrucciones.md` (proyecto BMad existente)
+- `.agents/`, `.codex/`, `.cursor/`, `.gemini/`, `.opencode/`, `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.claude/settings.json`
+- `_bmad/`, `_bmad-output/`, `docs/`, `design-artifacts/` (proyecto BMad existente)
+
+**Modificados en el code review (2026-07-19):**
+- `apps/{catalogo,carrito,perfil}/federation.config.mjs` — comentario `TODO(Story 1.3)` sobre el exposed module provisional
+- `apps/shell/project.json` — budget de producción recalibrado (`maximumWarning: 700kb`, `maximumError: 1mb`)
+- `nx.json` — agregado `targetDefaults` para `@angular-architects/native-federation:build` (cache/dependsOn/outputs)
+- `package.json` — removida la dependencia sin uso `zone.js`
+- `instrucciones.md` — agregada la política de congelamiento/bump-atómico de versiones
+- `.github/workflows/ci.yml` — **eliminado** (llegó del scaffolding del template, sin Nx Cloud configurado)
 
 ## Change Log
 
 - 2026-07-18/19: Implementación completa de Story 1.1. Workspace Nx 23.1.0 + Angular 22.0.6 inicializado; 4 apps (shell, catalogo, carrito, perfil) generadas; Native Federation 22.0.6 inicializado en las 4 con singleton compartido para todas las deps; verificado con lint/test/build. Status → review.
+- 2026-07-19: Code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor). 4 decision-needed resueltas (exposed module documentado como provisional, budget de NFR-7 calibrado, `requiredVersion: 'auto'` aceptado, `.github/workflows/ci.yml` eliminado) + 4 patches aplicados (Completion Notes corregidas, política de versionado agregada a `instrucciones.md`, `targetDefaults` de native-federation en `nx.json`, `zone.js` sin uso removido). Re-verificado AC4 con los 4 servers corriendo a la vez (antes solo se había probado el Shell aislado). Status → done.

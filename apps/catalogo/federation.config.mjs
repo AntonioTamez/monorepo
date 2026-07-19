@@ -3,8 +3,10 @@ import { withNativeFederation, shareAll } from '@angular-architects/native-feder
 export default withNativeFederation({
   name: 'catalogo',
 
-
-
+  // TODO(Story 1.3): reemplazar por un export de rutas lazy (ej. './Routes')
+  // apuntando a la feature lib del dominio -- exponer el AppComponent raiz es
+  // provisional (Story 1.1 aun no crea rutas de negocio). Ver ARCHITECTURE-SPINE.md
+  // Consistency Conventions: nunca el bootstrap completo del Remote.
   exposes: {
     './Component': './apps/catalogo/src/app/app.ts',
   },

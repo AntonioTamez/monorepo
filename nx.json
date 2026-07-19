@@ -48,6 +48,19 @@
         "production",
         "^production"
       ]
+    },
+    "@angular-architects/native-federation:build": {
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/{projectName}"
+      ]
     }
   },
   "plugins": [
