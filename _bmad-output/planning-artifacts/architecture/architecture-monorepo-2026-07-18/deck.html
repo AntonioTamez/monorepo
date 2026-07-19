@@ -1,0 +1,764 @@
+<title>Llano — Arquitectura del Monorepo</title>
+<style>
+  :root {
+    --ink: #10161f;
+    --surface: #1a222e;
+    --surface-2: #212b39;
+    --text: #dce3ea;
+    --text-muted: #8496a8;
+    --line: rgba(111, 177, 214, 0.22);
+    --line-strong: rgba(111, 177, 214, 0.42);
+    --accent: #6fb1d6;
+    --accent-strong: #9fd0ec;
+    --amber: #e0a458;
+    --amber-strong: #f0c088;
+    --radius: 3px;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, "Segoe UI", "IBM Plex Sans", Roboto, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink: #eef1f5;
+      --surface: #ffffff;
+      --surface-2: #e4e9ef;
+      --text: #1b232c;
+      --text-muted: #5b6772;
+      --line: rgba(46, 122, 158, 0.18);
+      --line-strong: rgba(46, 122, 158, 0.35);
+      --accent: #2e7a9e;
+      --accent-strong: #1c5c7a;
+      --amber: #b5762a;
+      --amber-strong: #8f5c1f;
+      color-scheme: light;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ink: #eef1f5;
+    --surface: #ffffff;
+    --surface-2: #e4e9ef;
+    --text: #1b232c;
+    --text-muted: #5b6772;
+    --line: rgba(46, 122, 158, 0.18);
+    --line-strong: rgba(46, 122, 158, 0.35);
+    --accent: #2e7a9e;
+    --accent-strong: #1c5c7a;
+    --amber: #b5762a;
+    --amber-strong: #8f5c1f;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --ink: #10161f;
+    --surface: #1a222e;
+    --surface-2: #212b39;
+    --text: #dce3ea;
+    --text-muted: #8496a8;
+    --line: rgba(111, 177, 214, 0.22);
+    --line-strong: rgba(111, 177, 214, 0.42);
+    --accent: #6fb1d6;
+    --accent-strong: #9fd0ec;
+    --amber: #e0a458;
+    --amber-strong: #f0c088;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 32px 32px,
+      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 32px 32px,
+      var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  a { color: var(--accent); }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  nav.side {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 20px;
+    border-right: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+
+  .brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 4px;
+  }
+  .brand strong {
+    display: block;
+    font-size: 20px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .nav-list { list-style: none; margin: 24px 0 0; padding: 0; }
+  .nav-list li { margin: 0; }
+  .nav-list a {
+    display: block;
+    padding: 7px 10px;
+    margin: 1px 0;
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .nav-list a:hover { color: var(--text); background: var(--surface-2); }
+  .nav-list a.active {
+    color: var(--accent-strong);
+    border-left-color: var(--accent);
+    background: var(--surface-2);
+    font-weight: 600;
+  }
+  .nav-group-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 18px 0 4px 10px;
+    opacity: 0.7;
+  }
+
+  .theme-toggle {
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--accent); }
+
+  main { padding: 56px 48px 120px; max-width: 980px; }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    nav.side { position: static; height: auto; }
+    main { padding: 32px 20px 80px; }
+  }
+
+  .hero { margin-bottom: 64px; }
+  .hero .eyebrow {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .hero h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    line-height: 1.1;
+    margin: 10px 0 14px;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+  .hero .thesis {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 62ch;
+    margin: 0 0 20px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .chip {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 4px 9px;
+    color: var(--text-muted);
+  }
+  .chip strong { color: var(--accent-strong); font-weight: 600; }
+
+  section { margin: 0 0 72px; scroll-margin-top: 24px; }
+  section h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 6px;
+  }
+  section .section-title {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  section p { max-width: 68ch; color: var(--text); }
+  section p.muted { color: var(--text-muted); }
+
+  .divider { border: none; border-top: 1px solid var(--line); margin: 0 0 72px; }
+
+  .diagram-wrap {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 18px;
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+  .diagram-wrap pre.mermaid { margin: 0; }
+  figcaption {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+
+  .lib-table, .stack-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin: 20px 0;
+  }
+  .lib-table th, .lib-table td,
+  .stack-table th, .stack-table td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .lib-table th, .stack-table th {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .stack-table td:last-child { font-family: var(--mono); font-size: 13.5px; }
+  code, .tag {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 1px 5px;
+  }
+
+  .ad-grid { display: flex; flex-direction: column; gap: 16px; }
+  .ad-card {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 18px 20px;
+  }
+  .ad-card .ad-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--amber);
+    letter-spacing: 0.04em;
+  }
+  .ad-card h3 { margin: 4px 0 12px; font-size: 17px; }
+  .ad-card dl { margin: 0; display: grid; grid-template-columns: 90px 1fr; gap: 6px 14px; }
+  .ad-card dt {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding-top: 2px;
+  }
+  .ad-card dd { margin: 0; font-size: 14.5px; }
+
+  .tree {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    overflow-x: auto;
+    line-height: 1.75;
+    white-space: pre;
+  }
+  .tree .c { color: var(--text-muted); }
+
+  .phase-list { display: flex; flex-direction: column; gap: 2px; margin: 20px 0; }
+  .phase {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .phase .ph-name { font-family: var(--mono); font-size: 12.5px; color: var(--accent-strong); }
+  .phase .ph-body p { margin: 0 0 4px; font-size: 14.5px; }
+  .phase .ph-frs { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .metric {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    background: var(--surface);
+  }
+  .metric .m-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .metric p { margin: 6px 0 0; font-size: 14.5px; }
+
+  .counter {
+    border-left: 3px solid var(--text-muted);
+    padding-left: 14px;
+    margin-top: 24px;
+  }
+  .counter .m-label { color: var(--text-muted); }
+
+  .deferred-list { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+  .deferred-list li {
+    list-style: none;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  .deferred-list .d-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  footer {
+    max-width: 68ch;
+    color: var(--text-muted);
+    font-size: 13px;
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    margin-top: 40px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+  }
+
+  html { scroll-behavior: smooth; }
+</style>
+
+<div class="shell">
+  <nav class="side" aria-label="Navegación del documento">
+    <p class="brand">Arquitectura<strong>Llano</strong></p>
+
+    <p class="nav-group-label">Contexto</p>
+    <ul class="nav-list">
+      <li><a href="#vision" data-nav>Visión</a></li>
+      <li><a href="#paradigma" data-nav>Paradigma</a></li>
+      <li><a href="#libs" data-nav>Organización de libs</a></li>
+    </ul>
+
+    <p class="nav-group-label">Decisiones</p>
+    <ul class="nav-list">
+      <li><a href="#decisiones" data-nav>AD-1 — AD-7</a></li>
+    </ul>
+
+    <p class="nav-group-label">Sustrato</p>
+    <ul class="nav-list">
+      <li><a href="#stack" data-nav>Stack</a></li>
+      <li><a href="#deployment" data-nav>Deployment</a></li>
+      <li><a href="#arbol" data-nav>Árbol de código</a></li>
+    </ul>
+
+    <p class="nav-group-label">Trayectoria</p>
+    <ul class="nav-list">
+      <li><a href="#roadmap" data-nav>Roadmap por fases</a></li>
+      <li><a href="#metricas" data-nav>Qué demuestra</a></li>
+      <li><a href="#deferred" data-nav>Diferido</a></li>
+    </ul>
+
+    <button class="theme-toggle" id="theme-toggle" type="button">tema: sistema</button>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Architecture Spine · MVP1</p>
+      <h1>Un Shell, tres Remotes, ninguna dependencia cruzada.</h1>
+      <p class="thesis">
+        Llano es un monorepo Nx que federa en runtime una app Shell y tres microfrontends Angular
+        independientes —Catálogo, Carrito/Checkout, Perfil— vía Native Federation. Este documento
+        recorre las decisiones que mantienen esa independencia real: qué puede depender de qué,
+        cómo se comparte estado entre Remotes sin acoplarlos, y qué pasa cuando uno falla.
+      </p>
+      <div class="meta-row">
+        <span class="chip">Paradigma: <strong>micro-frontend / shell + remotes</strong></span>
+        <span class="chip">Federación: <strong>Native Federation, estática (MVP1)</strong></span>
+        <span class="chip">Nx <strong>23.1</strong></span>
+        <span class="chip">Angular <strong>22</strong></span>
+      </div>
+    </header>
+
+    <section id="vision">
+      <h2>01 — Contexto</h2>
+      <p class="section-title">Por qué existe este proyecto</p>
+      <p>
+        Es un ejercicio de aprendizaje construido para entender —de primera mano, no en teoría— cómo
+        se coordinan builds, dependencias compartidas y despliegue entre aplicaciones Angular
+        independientes en un mismo repositorio. No hay backend real, ni pagos, ni usuarios reales:
+        los datos son mock. El valor está en la arquitectura misma, y en poder explicar con
+        propiedad cada decisión detrás de ella frente a un recruiter o entrevistador técnico.
+      </p>
+      <p class="muted">Fuente: PRD §1 Vision — prd-monorepo-2026-07-17.</p>
+    </section>
+
+    <section id="paradigma">
+      <h2>02 — Design Paradigm</h2>
+      <p class="section-title">Micro-frontend: Shell + Remotes federados</p>
+      <p>
+        El Shell carga los tres Remotes en tiempo de ejecución vía Native Federation, sobre el
+        <code>ApplicationBuilder</code> (esbuild) de Angular — sin depender de Webpack. En MVP1 la
+        federación es <strong>estática</strong>: las URLs de los tres Remotes están fijas en la
+        configuración del Shell. Angular y RxJS se comparten como Singleton para que ninguno de los
+        cuatro proyectos cargue su propia copia.
+      </p>
+      <figure class="diagram-wrap">
+        <pre class="mermaid">
+graph LR
+  subgraph Shell
+    ShellFeature[type:feature]
+  end
+  subgraph Catálogo
+    CatFeature[type:feature] --> CatUI[type:ui]
+    CatFeature --> CatDA[type:data-access]
+  end
+  subgraph Carrito
+    CarFeature[type:feature] --> CarUI[type:ui]
+    CarFeature --> CarDA[type:data-access]
+  end
+  subgraph Perfil
+    PerFeature[type:feature] --> PerUI[type:ui]
+    PerFeature --> PerDA[type:data-access]
+  end
+  CatUI --> Util[libs/shared/util-types]
+  CatDA --> Util
+  CarUI --> Util
+  CarDA --> Util
+  PerUI --> Util
+  PerDA --> Util
+  CatDA --> SharedCart[libs/shared/cart]
+  CarDA --> SharedCart
+  PerDA --> SharedAuth[libs/shared/auth]
+  CatFeature -.-> SharedAuth
+  CarFeature -.-> SharedAuth
+  ShellFeature --> SharedUI[libs/shared/ui]
+  CatUI --> SharedUI
+  CarUI --> SharedUI
+  PerUI --> SharedUI
+  ShellFeature -. federa en runtime .-> CatFeature
+  ShellFeature -. federa en runtime .-> CarFeature
+  ShellFeature -. federa en runtime .-> PerFeature
+        </pre>
+        <figcaption>Dirección de dependencia — ningún Remote importa código de otro (AD-1), y cada tipo de lib solo depende hacia "abajo" (AD-2).</figcaption>
+      </figure>
+    </section>
+
+    <section id="libs">
+      <h2>03 — Organización de libs</h2>
+      <p class="section-title">Tipado Nx estándar, no carpetas ad-hoc</p>
+      <p>
+        Elegido explícitamente por valor de aprendizaje: demuestra el patrón real de Nx, no una SPA
+        repartida en carpetas. Cada lib lleva dos tags — <code>scope</code> (a qué dominio pertenece)
+        y <code>type</code> (qué rol cumple) — enforced con <code>@nx/enforce-module-boundaries</code>.
+      </p>
+      <table class="lib-table">
+        <thead><tr><th>Tipo</th><th>Rol</th><th>Puede depender de</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag">feature</span></td><td>Smart components, rutas, orquestación de un dominio</td><td><span class="tag">ui</span>, <span class="tag">data-access</span>, <span class="tag">util</span> del mismo scope; <span class="tag">util</span>/<span class="tag">data-access</span> de scope:shared</td></tr>
+          <tr><td><span class="tag">ui</span></td><td>Componentes presentacionales puros, sin estado de negocio</td><td><span class="tag">util</span> únicamente</td></tr>
+          <tr><td><span class="tag">data-access</span></td><td>Estado y acceso a datos del dominio (services, signals, mocks)</td><td><span class="tag">util</span> únicamente</td></tr>
+          <tr><td><span class="tag">util</span></td><td>Tipos, helpers puros, sin Angular DI de negocio</td><td>nada — hoja del grafo</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="decisiones">
+      <h2>04 — Invariants &amp; Rules</h2>
+      <p class="section-title">Las siete decisiones que evitan que dos fases del build diverjan</p>
+      <p class="muted">
+        Cada una nombra qué liga (Binds), qué divergencia evita (Prevents) y la regla enforceable
+        (Rule). Todas <span class="tag">[ADOPTED]</span> — ya decididas, no abiertas.
+      </p>
+
+      <div class="ad-grid">
+        <article class="ad-card">
+          <span class="ad-id">AD-1</span>
+          <h3>Ningún Remote depende de otro Remote</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-1, FR-9, los 3 Remotes</dd>
+            <dt>Prevents</dt><dd>Acoplamiento directo entre Remotes que rompería la independencia de build/serve de FR-9.</dd>
+            <dt>Rule</dt><dd><code>apps/catalogo</code>, <code>apps/carrito</code>, <code>apps/perfil</code> solo dependen de <code>libs/shared/*</code>. Enforced vía tags <code>scope:*</code>.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-2</span>
+          <h3>Dirección de dependencia por tipo de lib</h3>
+          <dl>
+            <dt>Binds</dt><dd>Todas las libs del workspace</dd>
+            <dt>Prevents</dt><dd>Que <span class="tag">ui</span> llame <span class="tag">data-access</span> directo, o que <span class="tag">util</span> deje de ser una hoja segura.</dd>
+            <dt>Rule</dt><dd><code>feature → {ui, data-access, util} → util</code>. Ningún salto hacia atrás. Enforced vía tags <code>type:*</code>.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-3</span>
+          <h3>Estado cross-remote mutado solo vía servicio singleton + Signals</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-4, FR-6, FR-7, <code>libs/shared/cart</code>, <code>libs/shared/auth</code></dd>
+            <dt>Prevents</dt><dd>Que Catálogo y Carrito implementen cada uno su propia copia del carrito; que editar Perfil deje al Session Widget con un nombre desactualizado.</dd>
+            <dt>Rule</dt><dd>Un único service <code>providedIn: 'root'</code> por lib, con <code>signal()</code>/<code>computed()</code> como fuente de verdad. Editar Perfil llama al mismo método que usa el login.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-4</span>
+          <h3>Tipos de entidades cross-remote en una lib neutral</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-4, FR-6, FR-7, <code>Product</code>, <code>CartItem</code>, <code>User</code></dd>
+            <dt>Prevents</dt><dd>Que Catálogo y Carrito terminen con formas ligeramente distintas del mismo <code>Product</code>.</dd>
+            <dt>Rule</dt><dd><code>libs/shared/util-types</code> exporta las interfaces; <code>price</code> siempre <code>number</code> decimal, nunca centavos.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-5</span>
+          <h3>Fallo de carga de un Remote se aísla en su propio outlet</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-1, estado "Remote no disponible"</dd>
+            <dt>Prevents</dt><dd>Que un Remote caído tumbe la navegación completa, o que el error sea silencioso para un lector de pantalla.</dd>
+            <dt>Rule</dt><dd><code>loadRemoteModule().catch()</code> → <code>RemoteUnavailableComponent</code> con <code>role="alert"</code>. "Reintentar" reinvoca la carga, nunca un reload completo.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-6</span>
+          <h3>Angular/RxJS y libs compartidas, Singleton en la federación</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-1, FR-4, FR-7, NFR Reliability</dd>
+            <dt>Prevents</dt><dd>"Version mismatch" entre Shell y Remotes; que cada Remote bundlee su propia copia del service de carrito/sesión.</dd>
+            <dt>Rule</dt><dd><code>federation.config.mjs</code> declara Angular, RxJS, <code>auth</code>, <code>cart</code> y <code>util-types</code> como <code>singleton: true</code>.</dd>
+          </dl>
+        </article>
+
+        <article class="ad-card">
+          <span class="ad-id">AD-7</span>
+          <h3>Un solo deploy a Cloudflare Pages, base-href por Remote</h3>
+          <dl>
+            <dt>Binds</dt><dd>FR-11, deployment</dd>
+            <dt>Prevents</dt><dd>Que el catch-all del Shell se trague los assets de un Remote; que un Remote se buildee con el base-href equivocado.</dd>
+            <dt>Rule</dt><dd>Cada Remote con <code>--base-href=/{r}/</code>. <code>_redirects</code> lista las reglas de cada Remote antes que el catch-all del Shell.</dd>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="stack">
+      <h2>05 — Stack</h2>
+      <p class="section-title">Versiones fijadas, verificadas en vivo</p>
+      <p>Congeladas al iniciar Fase 0 para todo el roadmap — sin bumps salvo un blocker de seguridad real.</p>
+      <table class="stack-table">
+        <tbody>
+          <tr><td>Nx</td><td>23.1 — mínimo que soporta Angular 22</td></tr>
+          <tr><td>Angular</td><td>22</td></tr>
+          <tr><td>@angular-architects/native-federation</td><td>22.0.6</td></tr>
+          <tr><td>Node.js</td><td>24 (Active LTS)</td></tr>
+          <tr><td>TypeScript</td><td>strict: true</td></tr>
+          <tr><td>Tailwind CSS</td><td>config única en la raíz, extendida por los 4 proyectos</td></tr>
+          <tr><td>Hosting</td><td>Cloudflare Pages — free tier, 1 proyecto</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="deployment">
+      <h2>06 — Structural Seed</h2>
+      <p class="section-title">Un origin, cuatro apps, cero CORS</p>
+      <p>
+        Shell y los tres Remotes se sirven desde el mismo origin de Cloudflare Pages, cada uno en su
+        propio sub-path — deliberadamente MVP1-only: el PRD difiere el deploy independiente por
+        Remote a una extensión futura.
+      </p>
+      <figure class="diagram-wrap">
+        <pre class="mermaid">
+graph TB
+  Browser[Navegador del usuario]
+  subgraph CF["Cloudflare Pages — 1 proyecto, 1 origin"]
+    Shell["Shell — /"]
+    Cat["Catálogo — /catalogo"]
+    Car["Carrito — /carrito"]
+    Per["Perfil — /perfil"]
+  end
+  Browser -->|carga inicial| Shell
+  Shell -.federa en runtime.-> Cat
+  Shell -.federa en runtime.-> Car
+  Shell -.federa en runtime.-> Per
+  Cat --> SharedCart[("libs/shared/cart<br/>en memoria del tab")]
+  Car --> SharedCart
+  Shell --> SharedAuth[("libs/shared/auth<br/>localStorage")]
+  Cat --> SharedAuth
+  Car --> SharedAuth
+  Per --> SharedAuth
+        </pre>
+        <figcaption>Sin staging — no lo justifica un proyecto solo-operador sin usuarios reales.</figcaption>
+      </figure>
+    </section>
+
+    <section id="arbol">
+      <h2>07 — Árbol de código</h2>
+      <p class="section-title">Dónde vive cada cosa</p>
+      <div class="tree">{repo-root}/
+  apps/
+    shell/            <span class="c"># Host — federa los 3 Remotes, layout persistente</span>
+    catalogo/          <span class="c"># Remote — rutas del dominio Catálogo</span>
+    carrito/           <span class="c"># Remote — rutas del dominio Carrito/Checkout</span>
+    perfil/            <span class="c"># Remote — rutas del dominio Perfil</span>
+  libs/
+    catalogo/{feature-listado, ui, data-access}/
+    carrito/{feature-carrito, ui, data-access}/
+    perfil/{feature-perfil, ui, data-access}/
+    shared/
+      ui/              <span class="c"># Design System — Botón, Card, Header/Nav, Category Chip…</span>
+      auth/            <span class="c"># Sesión Compartida (AD-3)</span>
+      cart/            <span class="c"># Carrito Compartido (AD-3)</span>
+      util-types/      <span class="c"># Product / CartItem / User (AD-4)</span></div>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="roadmap">
+      <h2>08 — Roadmap por fases</h2>
+      <p class="section-title">~1 fase por semana, ritmo part-time</p>
+      <div class="phase-list">
+        <div class="phase">
+          <div class="ph-name">Fase 0 — Scaffolding</div>
+          <div class="ph-body"><p>Workspace Nx, Shell + 3 Remotes vacíos con Native Federation configurada, routing básico.</p><span class="ph-frs">FR-1, FR-9</span></div>
+        </div>
+        <div class="phase">
+          <div class="ph-name">Fase 1 — Catálogo</div>
+          <div class="ph-body"><p>Microfrontend Catálogo con datos mock y filtro; primeros componentes a libs/shared/ui.</p><span class="ph-frs">FR-3, FR-8</span></div>
+        </div>
+        <div class="phase">
+          <div class="ph-name">Fase 2 — Carrito + Sesión</div>
+          <div class="ph-body"><p>Carrito/Checkout con estado cross-remote vía libs/shared/cart; sesión mock vía libs/shared/auth.</p><span class="ph-frs">FR-2, FR-4, FR-5, FR-7</span></div>
+        </div>
+        <div class="phase">
+          <div class="ph-name">Fase 3 — Perfil + Pulido</div>
+          <div class="ph-body"><p>Microfrontend Perfil; revisión de NFRs (build, nx affected); pulido de header compartido.</p><span class="ph-frs">FR-2, FR-6</span></div>
+        </div>
+        <div class="phase">
+          <div class="ph-name">Fase 4 — Deploy + Docs</div>
+          <div class="ph-body"><p>Demo pública en Cloudflare Pages; README con diagrama de arquitectura.</p><span class="ph-frs">FR-10, FR-11</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="metricas">
+      <h2>09 — Qué demuestra este proyecto</h2>
+      <p class="section-title">Success metrics, no solo "funciona"</p>
+      <div class="metric-grid">
+        <div class="metric"><span class="m-label">SM-1</span><p>Explicar y demostrar en voz alta cómo funciona Native Federation (host/remote/singleton) y por qué se prefirió sobre Module Federation clásico.</p></div>
+        <div class="metric"><span class="m-label">SM-2</span><p>Shell + 3 Remotes corren federados, local y en producción, sin errores de version mismatch entre Angular/RxJS.</p></div>
+        <div class="metric"><span class="m-label">SM-3</span><p>Demo pública desplegada, accesible vía URL compartible, navegable end-to-end (Catálogo → Carrito → Perfil).</p></div>
+      </div>
+      <div class="counter">
+        <span class="m-label">Counter-metrics — qué NO optimizar</span>
+        <p>No copiar patrones de tutoriales sin entenderlos. No sacrificar la independencia real de cada Remote con atajos que los acoplen solo para ahorrar tiempo.</p>
+      </div>
+    </section>
+
+    <section id="deferred">
+      <h2>10 — Deferred</h2>
+      <p class="section-title">Lo que esta arquitectura deja abierto, a propósito</p>
+      <ul class="deferred-list">
+        <li><span class="d-tag">Testing</span>Profundidad de unit/e2e cross-remote — abierto en el PRD (Open Question 4).</li>
+        <li><span class="d-tag">CI/CD</span>Deploy independiente por Remote — extensión futura confirmada, fuera de MVP1.</li>
+        <li><span class="d-tag">MVP2</span>Federación dinámica vía Manifest — dirección ya fijada, forma sin decidir.</li>
+        <li><span class="d-tag">Estado</span>Escalar a NgRx si el carrito/sesión creciera en complejidad — hoy Signals alcanza.</li>
+        <li><span class="d-tag">Resiliencia</span>Aislar errores de runtime dentro de un Remote ya montado (más allá de fallos de carga) — Angular no tiene error boundaries nativos por subárbol.</li>
+      </ul>
+    </section>
+
+    <footer>
+      Arquitectura distilada de <code>prd-monorepo-2026-07-17</code> y <code>ux-monorepo-2026-07-17</code>.
+      Spine completo en <code>ARCHITECTURE-SPINE.md</code>, mismo directorio.
+    </footer>
+  </main>
+</div>
+
+<script>
+  const navLinks = document.querySelectorAll('[data-nav]');
+  const sections = Array.from(navLinks).map(a => document.querySelector(a.getAttribute('href')));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = '#' + entry.target.id;
+      const link = document.querySelector('[data-nav][href="' + id + '"]');
+      if (!link) return;
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -70% 0px' });
+  sections.forEach(s => s && io.observe(s));
+
+  const toggle = document.getElementById('theme-toggle');
+  const modes = ['system', 'dark', 'light'];
+  let modeIndex = 0;
+  toggle.addEventListener('click', () => {
+    modeIndex = (modeIndex + 1) % modes.length;
+    const mode = modes[modeIndex];
+    toggle.textContent = 'tema: ' + mode;
+    if (mode === 'system') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', mode);
+    }
+  });
+</script>

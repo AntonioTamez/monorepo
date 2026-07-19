@@ -1,0 +1,91 @@
+# generated: 2026-07-18
+# last_updated: 2026-07-18
+# project: monorepo
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-07-18
+last_updated: 2026-07-18
+project: monorepo
+project_key: NOKEY
+tracking_system: file-system
+story_location: '{project-root}/_bmad-output/implementation-artifacts'
+
+development_status:
+  epic-1: backlog
+  1-1-scaffolding-del-workspace-nx-con-shell-y-3-remotes-federados: backlog
+  1-2-organizacion-de-libs-con-tags-nx-y-boundaries-enforced: backlog
+  1-3-navegacion-federada-entre-las-3-rutas-del-shell: backlog
+  1-4-skeleton-de-carga-mientras-un-remote-federa: backlog
+  1-5-estado-remote-no-disponible-con-reintento: backlog
+  1-6-independencia-real-de-build-y-serve-por-remote: backlog
+  1-7-tokens-de-diseno-y-config-unica-de-tailwind: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-modelo-de-product-y-dataset-mock-del-catalogo: backlog
+  2-2-listado-de-productos-con-product-card: backlog
+  2-3-filtro-por-categoria-con-category-chip: backlog
+  2-4-estado-sin-resultados-del-filtro: backlog
+  2-5-boton-primario-secundario-consolidados-en-el-design-system-compartido: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-servicio-de-carrito-compartido-con-signals-tipo-cartitem: backlog
+  3-2-agregar-producto-al-carrito-desde-catalogo-cross-remote: backlog
+  3-3-header-nav-completo-con-cart-badge: backlog
+  3-4-listado-de-carrito-con-cart-line-item-y-gestion-de-cantidades: backlog
+  3-5-estado-de-carrito-vacio: backlog
+  3-6-checkout-simulado-con-confirmacion: backlog
+  3-7-sesion-compartida-mock-con-login-form: backlog
+  3-8-cerrar-sesion-con-estado-limpiado-en-las-3-superficies: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-ver-y-editar-perfil-con-sesion-iniciada: backlog
+  4-2-persistencia-del-perfil-editado: backlog
+  4-3-historial-simulado-de-pedidos: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-script-de-build-combinado-con-base-href-por-remote: backlog
+  5-2-reglas-redirects-para-servir-las-4-apps-desde-un-origin: backlog
+  5-3-deploy-publico-a-cloudflare-pages: backlog
+  5-4-readme-con-instrucciones-y-diagrama-de-arquitectura: backlog
+  epic-5-retrospective: optional

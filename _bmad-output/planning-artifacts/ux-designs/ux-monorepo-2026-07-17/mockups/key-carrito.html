@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Llano — Carrito (mock visual)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+/*
+  Governs: DESIGN.md — Colors, Typography, Layout & Spacing, Elevation & Depth,
+  Shapes, Components (Header/Nav, Cart Line Item, Cart Badge, Session Widget,
+  Botón primario/secundario). EXPERIENCE.md — Information Architecture (Carrito
+  row), Component Patterns (Cart Line Item, Checkout Button, Header/Nav),
+  State Patterns (Checkout confirmado — "Carrito vacío" state is NOT depicted
+  here, only "con items" and "Checkout confirmado" per the task brief), Voice
+  and Tone ("Compra confirmada", no exclamation marks), Interaction Primitives
+  (stepper +/-, no free-text quantity input; delete is explicit, not qty->0),
+  Anti-patterns (no confetti/celebration animation on checkout confirmation).
+
+  Two states are shown stacked in this single file, each under a dashed
+  annotation strip that is NOT part of the product UI — it exists only to
+  label the mock for reviewers.
+
+  Font stand-ins (no external fonts/CDN allowed per task constraints):
+  --font-serif stands in for Fraunces. --font-sans stands in for Inter.
+*/
+:root {
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F7F7F6;
+  --color-surface-container: #EFEFED;
+  --color-border: #E0E0DD;
+  --color-border-strong: #8A8A85;
+  --color-ink: #141414;
+  --color-ink-muted: #5C5C58;
+  --color-ink-faint: #9A9A95;
+  --color-accent: #B8432B;
+  --color-accent-hover: #96351F;
+  --color-accent-foreground: #FFFFFF;
+  --color-success: #3F6B4E;
+  --color-success-foreground: #FFFFFF;
+  --color-error: #B3261E;
+  --color-error-foreground: #FFFFFF;
+
+  --font-serif: Georgia, 'Times New Roman', serif; /* stand-in for Fraunces */
+  --font-sans: -apple-system, Helvetica, Arial, sans-serif; /* stand-in for Inter */
+
+  --radius-sm: 2px;
+  --radius-default: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
+  --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
+  --gutter: 24px;
+  --margin-desktop: 80px;
+  --editorial-gap: 96px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-top: 72px;
+}
+a { color: inherit; }
+button { font-family: inherit; }
+*:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.headline-md { font-family: var(--font-serif); font-size: 32px; font-weight: 400; line-height: 1.15; margin: 0; }
+.headline-sm { font-family: var(--font-serif); font-size: 22px; font-weight: 400; line-height: 1.25; margin: 0; }
+.body-lg { font-family: var(--font-sans); font-size: 17px; font-weight: 400; line-height: 1.55; }
+.body-md { font-family: var(--font-sans); font-size: 15px; font-weight: 400; line-height: 1.5; }
+.label { font-family: var(--font-sans); font-size: 13px; font-weight: 500; line-height: 1.3; letter-spacing: 0.04em; text-transform: uppercase; }
+.caption { font-family: var(--font-sans); font-size: 12px; font-weight: 400; line-height: 1.4; }
+
+.btn { font-size: 15px; border: none; cursor: pointer; padding: var(--sp-3) var(--sp-6); border-radius: var(--radius-sm); }
+.btn-primary { background: var(--color-accent); color: var(--color-accent-foreground); }
+.btn-primary:hover { background: var(--color-accent-hover); }
+.btn-primary:disabled { background: var(--color-ink-faint); color: var(--color-accent-foreground); cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--color-ink); border: 1px solid var(--color-border-strong); }
+.btn-secondary:hover { border-color: var(--color-ink); }
+
+/* Header/Nav — persistent, identical across the 3 surfaces */
+.llano-header { position: fixed; top: 0; left: 0; right: 0; background: var(--color-surface); border-bottom: 1px solid var(--color-border); z-index: 100; }
+.header-inner { max-width: 1280px; margin: 0 auto; padding: 0 var(--margin-desktop); height: 72px; display: flex; align-items: center; justify-content: space-between; }
+.brand { font-family: var(--font-serif); font-size: 24px; color: var(--color-ink); text-decoration: none; }
+.header-nav { display: flex; align-items: center; gap: var(--sp-6); }
+.nav-link { font-family: var(--font-sans); font-size: 15px; color: var(--color-ink); text-decoration: none; }
+.icon-btn { position: relative; background: none; border: none; cursor: pointer; padding: var(--sp-2); display: flex; align-items: center; justify-content: center; color: var(--color-ink); }
+.icon { width: 22px; height: 22px; }
+.cart-badge { position: absolute; top: 0px; right: 0px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: var(--radius-full); background: var(--color-accent); color: var(--color-accent-foreground); font-family: var(--font-sans); font-size: 11px; line-height: 16px; text-align: center; }
+.session-icon { width: 30px; height: 30px; border-radius: var(--radius-full); background: var(--color-surface-container); display: flex; align-items: center; justify-content: center; color: var(--color-ink-muted); }
+
+.page { max-width: 1280px; margin: 0 auto; padding: 0 var(--margin-desktop); }
+
+/* Mock-only annotation strip — labels which State Pattern each section shows */
+.state-strip { margin: var(--sp-16) 0 var(--sp-6); padding: var(--sp-2) var(--sp-4); border-top: 1px dashed var(--color-border-strong); border-bottom: 1px dashed var(--color-border-strong); background: var(--color-surface-alt); color: var(--color-ink-muted); }
+.state-strip:first-of-type { margin-top: var(--sp-12); }
+
+.cart-section { max-width: 640px; padding-bottom: var(--sp-16); }
+
+.cart-line { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) 0; border-bottom: 1px solid var(--color-border); }
+.cart-line-image { width: 48px; height: 60px; border-radius: var(--radius-sm); background: var(--color-surface-container); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.cart-line-image span { font-size: 9px; color: var(--color-ink-faint); font-family: var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; }
+.cart-line-info { flex: 1; }
+.cart-line-title { font-family: var(--font-sans); font-size: 15px; color: var(--color-ink); display: block; margin-bottom: var(--sp-2); }
+.cart-line-stepper { display: inline-flex; align-items: center; gap: var(--sp-1); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); }
+.stepper-btn { background: none; border: none; width: 28px; height: 28px; font-size: 16px; cursor: pointer; color: var(--color-ink); }
+.stepper-qty { min-width: 22px; text-align: center; font-family: var(--font-sans); font-size: 14px; }
+.cart-line-price { font-family: var(--font-sans); font-size: 15px; color: var(--color-accent); width: 70px; text-align: right; flex-shrink: 0; }
+.cart-line-delete { background: none; border: none; cursor: pointer; color: var(--color-ink-muted); width: 32px; height: 32px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cart-line-delete:hover { background: var(--color-error); color: var(--color-error-foreground); }
+
+.cart-total-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--sp-6) 0; border-bottom: 1px solid var(--color-border); margin-bottom: var(--sp-6); }
+.cart-total-amount { font-family: var(--font-serif); font-size: 22px; color: var(--color-accent); }
+
+/* Checkout confirmado */
+.confirm-block { padding-bottom: var(--sp-16); max-width: 480px; }
+.confirm-icon { width: 48px; height: 48px; border-radius: var(--radius-full); background: var(--color-success); display: flex; align-items: center; justify-content: center; color: var(--color-success-foreground); margin-bottom: var(--sp-4); }
+.confirm-title { color: var(--color-success); margin-bottom: var(--sp-3); }
+.confirm-body { color: var(--color-ink); margin-bottom: var(--sp-8); }
+</style>
+</head>
+<body>
+
+<header class="llano-header">
+  <div class="header-inner">
+    <a class="brand" href="#" aria-label="Llano — inicio">Llano</a>
+    <nav class="header-nav" aria-label="Navegación principal">
+      <a class="nav-link" href="#">Catálogo</a>
+      <button class="icon-btn" type="button" aria-label="Carrito, 2 productos">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+          <path d="M6 8h12l-1 12H7L6 8z"/>
+          <path d="M9 8V6a3 3 0 0 1 6 0v2"/>
+        </svg>
+        <span class="cart-badge caption" aria-hidden="true">2</span>
+      </button>
+      <button class="icon-btn" type="button" aria-label="Perfil. Sesión no iniciada">
+        <span class="session-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" focusable="false">
+            <circle cx="12" cy="8" r="3.2"/>
+            <path d="M5 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/>
+          </svg>
+        </span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+
+  <p class="caption state-strip">Estado — Carrito con productos (EXPERIENCE.md Component Patterns: Cart Line Item, Checkout Button)</p>
+  <section class="cart-section" aria-label="Carrito">
+    <h1 class="headline-md" style="margin-bottom: var(--sp-8);">Tu carrito</h1>
+
+    <div class="cart-line">
+      <div class="cart-line-image" aria-hidden="true"><span>foto</span></div>
+      <div class="cart-line-info">
+        <span class="cart-line-title">Bowl Terroso</span>
+        <div class="cart-line-stepper" role="group" aria-label="Cantidad de Bowl Terroso">
+          <button class="stepper-btn" type="button" aria-label="Reducir cantidad de Bowl Terroso">−</button>
+          <span class="stepper-qty" aria-live="polite">1</span>
+          <button class="stepper-btn" type="button" aria-label="Aumentar cantidad de Bowl Terroso">+</button>
+        </div>
+      </div>
+      <span class="cart-line-price">$420</span>
+      <button class="cart-line-delete" type="button" aria-label="Eliminar Bowl Terroso del carrito">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M4 7h16"/>
+          <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          <path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="cart-line">
+      <div class="cart-line-image" aria-hidden="true"><span>foto</span></div>
+      <div class="cart-line-info">
+        <span class="cart-line-title">Manta de Lino</span>
+        <div class="cart-line-stepper" role="group" aria-label="Cantidad de Manta de Lino">
+          <button class="stepper-btn" type="button" aria-label="Reducir cantidad de Manta de Lino">−</button>
+          <span class="stepper-qty" aria-live="polite">2</span>
+          <button class="stepper-btn" type="button" aria-label="Aumentar cantidad de Manta de Lino">+</button>
+        </div>
+      </div>
+      <span class="cart-line-price">$1900</span>
+      <button class="cart-line-delete" type="button" aria-label="Eliminar Manta de Lino del carrito">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M4 7h16"/>
+          <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          <path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="cart-total-row">
+      <span class="label">Total</span>
+      <span class="cart-total-amount">$2320</span>
+    </div>
+
+    <button class="btn btn-primary" type="button">Confirmar compra</button>
+  </section>
+
+  <p class="caption state-strip">Estado — Checkout confirmado (EXPERIENCE.md State Patterns: reemplaza la lista de items, el carrito queda vacío)</p>
+  <section class="confirm-block" aria-label="Compra confirmada">
+    <div class="confirm-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22" focusable="false">
+        <path d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+    <h2 class="headline-sm confirm-title">Compra confirmada</h2>
+    <p class="body-lg confirm-body">Pagaste $2320.</p>
+    <button class="btn btn-secondary" type="button">Volver al Catálogo</button>
+  </section>
+
+</main>
+
+</body>
+</html>
