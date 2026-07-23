@@ -113,3 +113,40 @@ Esta vez el hallazgo importante no fue un bug de la historia, sino **una contrad
 También se detectó que la prueba de AC3 (boundary de scope) de la primera pasada no había probado nada de verdad — había fallado por una regla genérica de Nx, no por la regla de scope en sí. Se rehizo con libs de mentira con scopes distintos, y ahí sí se vio el mensaje real de la regla.
 
 **Un finding que se investigó y se descartó, para que quede como ejemplo de "verificar antes de aplicar":** un revisor sugirió agregar una regla de "fallback" para proyectos sin tag. Antes de tocar nada, se confirmó contra la documentación oficial de Nx que el comportamiento real es al revés de lo que el revisor asumía — un proyecto sin tags ya está bloqueado por default, no libre. Agregar el fallback sugerido hubiera sido el error, no la solución.
+
+## Story 1.3 — Navegación federada entre las 3 rutas del Shell
+
+### Comandos ejecutados (en orden)
+
+1. **Editar `apps/shell/src/app/app.routes.ts`** (antes era `[]`) para agregar las 3 rutas federadas:
+   ```ts
+   { path: 'catalogo', loadComponent: () => loadRemoteModule('catalogo', './Component').then(m => m.App) }
+   ```
+   (y lo mismo para `carrito`/`perfil`). `loadRemoteModule` viene del mismo paquete (`@angular-architects/native-federation`) que ya usa `main.ts` para inicializar la federación — no hace falta instalar nada nuevo.
+
+2. **`npx nx lint shell`** — confirma que la sintaxis nueva compila y pasa lint.
+
+3. **Levantar los 4 dev servers** (`nx serve shell/catalogo/carrito/perfil`) y probar las 3 rutas con `curl` (`http://localhost:4200/catalogo`, etc.) — todas responden 200, y los logs de los 4 servidores no muestran errores.
+
+4. **`npx nx run-many -t lint,test,build --projects=shell,catalogo,carrito,perfil`** — regresión final, 12/12 verde.
+
+### Por qué se hizo así
+
+- **`loadComponent` + `'./Component'`, no `loadChildren` + `'./Routes'`.** Los 3 Remotes ya exponen `'./Component'` desde Story 1.1 (apuntando a su `AppComponent` raíz), con un comentario `TODO(Story 1.3)` sugiriendo cambiarlo a un export de rutas. Se investigó esa sugerencia y **no aplicaba todavía**: ningún Remote tiene rutas de negocio propias hasta que existan sus libs `feature` (Epic 2). `loadChildren` recién tiene sentido cuando el Remote expone su propio array de `Routes`, no un componente único. El comentario TODO se dejó tal cual — sigue siendo correcto, solo que "todavía no es el momento".
+- **El nombre de la clase exportada es `App`, no `AppComponent`.** Los ejemplos genéricos de la documentación de Native Federation usan `.then(m => m.AppComponent)`, pero los 3 `app.ts` de este proyecto (generados por Nx) exportan `export class App`. Se verificó leyendo el código real antes de escribir la historia — si se copiaba el ejemplo de la doc tal cual, el build hubiera fallado con un error de tipo poco obvio de diagnosticar.
+
+### Problemas y soluciones
+
+- **Sin navegador real disponible, otra vez.** Igual que en Story 1.1, este entorno no tiene un navegador para confirmar visualmente que la navegación no recarga la página completa (AC1) ni que cada Remote aparece como entrada de red separada en el Network tab (AC2). Se intentó activar la skill `claude-in-chrome`, pero la extensión no estaba instalada en esta sesión. Quedó verificado por `curl` (las 3 rutas responden, sin errores en los logs de servidor) pero **falta la confirmación visual** — vale la pena que Antonio abra `nx serve shell` (con los 3 remotos también corriendo) en Chrome/Edge y mire el Network tab al navegar entre `/catalogo`, `/carrito`, `/perfil`.
+
+### Code review de Story 1.3 (2026-07-22)
+
+**El hallazgo más importante:** el `curl` de la sección anterior en realidad **no probaba nada nuevo**. El fallback SPA de Angular ya devolvía HTTP 200 + el mismo `index.html` en esas rutas *antes* de esta historia, cuando `appRoutes` todavía era `[]` — `curl` no ejecuta JavaScript, así que no puede ver si el router realmente cargó el Remote o no. Es una lección útil: cuando la evidencia de una verificación no depende del cambio que se está probando, no es evidencia real. Se corrigió la redacción de la historia para no sobre-vender esto, y también se corrigieron los checkboxes de las tareas de verificación, que decían "hecho" aunque el propio texto ya admitía que no se había podido confirmar.
+
+**Comandos ejecutados en esta ronda:**
+
+1. Se creó `apps/shell/src/app/remote-names.ts` con una constante `REMOTE_NAMES` (`{ catalogo: 'catalogo', carrito: 'carrito', perfil: 'perfil' }`), y se usó tanto en `main.ts` (`initFederation`) como en `app.routes.ts` (`loadRemoteModule`) — antes los 3 nombres de remote estaban sueltos como strings en dos archivos distintos, sin nada que garantice que coincidan si alguno cambia.
+2. Se agregaron 2 rutas nuevas al final de `appRoutes`: `{ path: '', redirectTo: 'catalogo', pathMatch: 'full' }` y `{ path: '**', redirectTo: 'catalogo' }` — antes, entrar a `/` mostraba el boilerplate de Nx sin sentido, y cualquier URL desconocida no hacía nada.
+3. Se agregó un comentario en `app.routes.ts` explicando por qué no hay `.catch()` en `loadRemoteModule(...)` (es a propósito, AD-5/Story 1.5) — mismo estilo que ya usan los `federation.config.mjs` para señalar gaps diferidos.
+4. Se corrigió `deferred-work.md`: un ítem de Story 1.1 decía ambiguamente "Story 1.3/1.5" para el `.catch()` que traga errores — como esta historia confirmó que el gap sigue sin resolver, se acotó a "Story 1.5" únicamente.
+5. Regresión completa re-corrida tras los cambios (12/12 verde).
